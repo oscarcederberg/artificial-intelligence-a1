@@ -1,3 +1,5 @@
+import math
+from xml.etree.ElementTree import tostring
 import gym
 import random
 import requests
@@ -40,13 +42,6 @@ def check_stats():
    stats = res.json()
    return stats
 
-"""
-You can make your code work against this simple random agent
-before playing against the server.
-It returns a move 0-6 or -1 if it could not make a move.
-To check your code for better performance, change this code to
-use your own algorithm for selecting actions too
-"""
 def opponents_move(env):
    env.change_player() # change to oppoent
    avmoves = env.available_moves()
@@ -66,13 +61,9 @@ def opponents_move(env):
    env.change_player() # change back to student before returning
    return state, reward, done
 
-def student_move():
-   """
-   TODO: Implement your min-max alpha-beta pruning algorithm here.
-   Give it whatever input arguments you think are necessary
-   (and change where it is called).
-   The function should return a move from 0-6
-   """
+def student_move(state):
+   possibleMoves = possible_moves(state)
+   #alphabeta(state, 10, -math.inf, math.inf, True)
    return random.choice([0, 1, 2, 3, 4, 5, 6])
 
 def play_game(vs_server = False):
@@ -119,7 +110,7 @@ def play_game(vs_server = False):
    done = False
    while not done:
       # Select your move
-      stmove = student_move() # TODO: change input here
+      stmove = student_move(state) # TODO: change input here
 
       # make both student and bot/server moves
       if vs_server:
@@ -195,9 +186,43 @@ def main():
       stats = check_stats()
       print(stats)
 
-   # TODO: Run program with "--online" when you are ready to play against the server
-   # the results of your games there will be logged
-   # you can check your stats bu running the program with "--stats"
-
 if __name__ == "__main__":
     main()
+
+# My code
+#
+def possible_moves(move):
+   possibleMoves = []
+   for i in range(7):
+      if move[0][i] == 0:
+         for j in range(6):
+            if j == 5:
+               nextMove = np.copy(move)
+               nextMove[i][5] = 1
+               possibleMoves.append(nextMove)
+            elif move[j][i] != 0:
+               nextMove = np.copy(move)
+               nextMove[i][j] = 1
+               possibleMoves.append(nextMove)
+   return possibleMoves 
+
+def alpha_beta_pruning(move, depth, alpha, beta, max):
+   if depth == 0 or is_terminal(move):
+      return eval_move(move)
+   possibleMoves = possible_moves(move)
+   if max:
+      value = -math.inf
+      for nextMove in possibleMoves:
+         value = max(value, alpha_beta_pruning(nextMove, depth - 1, alpha, beta, False))
+         alpha = max(alpha, value)
+         if value >= beta:
+            break
+      return value
+   else:
+      value = math.inf
+      for nextMove in possibleMoves:
+         value = min(value, alpha_beta_pruning(nextMove, depth - 1, alpha, beta, True))
+         beta = min(beta, value)
+         if value <= alpha:
+            break
+      return value
