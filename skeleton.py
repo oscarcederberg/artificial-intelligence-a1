@@ -11,7 +11,7 @@ env: ConnectFourEnv = gym.make("ConnectFour-v0")
 #SERVER_ADRESS = "http://localhost:8000/"
 SERVER_ADRESS = "https://vilde.cs.lth.se/edap01-4inarow/"
 API_KEY = 'nyckel'
-STIL_ID = ["da20example-s1", "da22test-s2"] # TODO: fill this list with your stil-id's
+STIL_ID = ["os7138ce-s"] 
 
 def call_server(move):
    res = requests.post(SERVER_ADRESS + "move",
