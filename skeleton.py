@@ -1,4 +1,5 @@
 import math
+from operator import contains, itemgetter
 from xml.etree.ElementTree import tostring
 import gym
 import random
@@ -14,6 +15,142 @@ env: ConnectFourEnv = gym.make("ConnectFour-v0")
 SERVER_ADRESS = "https://vilde.cs.lth.se/edap01-4inarow/"
 API_KEY = 'nyckel'
 STIL_ID = ["os7138ce-s"] 
+
+# my code
+#
+def possible_moves(move, isPlayer):
+   possiblemoves = []
+   for i in range(7):
+      if move[0][i] == 0:
+         for j in range(6):
+            if move[j][i] != 0:
+               nextmove = np.copy(move)
+               nextmove[j-1][i] = (1 if isPlayer else -1)
+               possiblemoves.append((i, nextmove))
+            elif j == 5:
+               nextmove = np.copy(move)
+               nextmove[j][i] = (1 if isPlayer else -1)
+               possiblemoves.append((i, nextmove))
+   return possiblemoves 
+
+def is_terminal(move):
+   if len(possible_moves(move, True)) == 0:
+      return True
+   
+   # taken from connect_four_env
+   # test rows
+   for i in range(6):
+      for j in range(7 - 3):
+            value = sum(move[i][j:j + 4])
+            if abs(value) == 4:
+               return True
+   # test columns on transpose array
+   transposed_board = [list(i) for i in zip(*move)]
+   for i in range(6):
+      for j in range(7 - 3):
+            value = sum(transposed_board[i][j:j + 4])
+            if abs(value) == 4:
+               return True
+   # test diagonal
+   for i in range(6 - 3):
+      for j in range(7 - 3):
+            value = 0
+            for k in range(4):
+               value += move[i + k][j + k]
+               if abs(value) == 4:
+                  return True
+   reversed_board = np.fliplr(move)
+   # test reverse diagonal
+   for i in range(6 - 3):
+      for j in range(7 - 3):
+            value = 0
+            for k in range(4):
+               value += reversed_board[i + k][j + k]
+               if abs(value) == 4:
+                  return True
+
+   return False
+
+def eval_move(move):
+   # taken from connect_four_env
+   # test rows
+   evalsum = 0
+
+   for i in range(6):
+      for j in range(7 - 3):
+            values = move[i][j:j + 4]
+            value = sum(values)
+            if abs(value) == 4:
+               return math.copysign(1, value) * math.inf
+            if not contains(values, -1):
+               evalsum += math.pow(10, abs(value))
+            elif not contains (values, 1):
+               evalsum -= math.pow(10, abs(value))
+
+   # test columns on transpose array
+   transposed = [list(i) for i in zip(*move)]
+   for i in range(6):
+      for j in range(7 - 3):
+            values = transposed[i][j:j + 4]
+            value = sum(values)
+            if abs(value) == 4:
+               return math.copysign(1, value) * math.inf
+            if not contains(values, -1):
+               evalsum += math.pow(10, abs(value))
+            elif not contains (values, 1):
+               evalsum -= math.pow(10, abs(value))
+   
+   # test diagonal
+   for i in range(6 - 3):
+      for j in range(7 - 3):
+            values = []
+            for k in range(4):
+               values.append(move[i + k][j + k])
+            value = sum(values)
+            if abs(value) == 4:
+               return math.copysign(1, value) * math.inf
+            if not contains(values, -1):
+               evalsum += math.pow(10, abs(value))
+            elif not contains (values, 1):
+               evalsum -= math.pow(10, abs(value))
+            
+   reversed_board = np.fliplr(move)
+   # test reverse diagonal
+   for i in range(6 - 3):
+      for j in range(7 - 3):
+            values = []
+            for k in range(4):
+               values.append(reversed_board[i + k][j + k])
+            value = sum(values)
+            if abs(value) == 4:
+               return math.copysign(1, value) * math.inf
+            if not contains(values, -1):
+               evalsum += math.pow(10, abs(value))
+            elif not contains (values, 1):
+               evalsum -= math.pow(10, abs(value))
+   
+   return evalsum
+
+def alpha_beta_pruning(move, depth, alpha, beta, isPlayer):
+   if depth == 0 or is_terminal(move):
+      return eval_move(move)
+   possiblemoves = possible_moves(move, isPlayer)
+   if isPlayer:
+      value = -math.inf
+      for (_, nextmove) in possiblemoves:
+         value = max(value, alpha_beta_pruning(nextmove, depth - 1, alpha, beta, False))
+         alpha = max(alpha, value)
+         if value >= beta:
+            break
+      return value
+   else:
+      value = math.inf
+      for (_, nextmove) in possiblemoves:
+         value = min(value, alpha_beta_pruning(nextmove, depth - 1, alpha, beta, True))
+         beta = min(beta, value)
+         if value <= alpha:
+            break
+      return value
 
 def call_server(move):
    res = requests.post(SERVER_ADRESS + "move",
@@ -62,9 +199,15 @@ def opponents_move(env):
    return state, reward, done
 
 def student_move(state):
-   possibleMoves = possible_moves(state)
-   #alphabeta(state, 10, -math.inf, math.inf, True)
-   return random.choice([0, 1, 2, 3, 4, 5, 6])
+   possibleMoves = possible_moves(state, True)
+   
+   if len(possibleMoves) == 1:
+      return possibleMoves[0];
+   
+   moveEvaluations = []
+   for (choice, move) in possibleMoves:
+      moveEvaluations.append((choice, alpha_beta_pruning(move, 4, -math.inf, math.inf, False)))
+      return max(moveEvaluations, key=itemgetter(1))[0]
 
 def play_game(vs_server = False):
    """
@@ -110,7 +253,7 @@ def play_game(vs_server = False):
    done = False
    while not done:
       # Select your move
-      stmove = student_move(state) # TODO: change input here
+      stmove = student_move(state) 
 
       # make both student and bot/server moves
       if vs_server:
@@ -188,41 +331,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# My code
-#
-def possible_moves(move):
-   possibleMoves = []
-   for i in range(7):
-      if move[0][i] == 0:
-         for j in range(6):
-            if j == 5:
-               nextMove = np.copy(move)
-               nextMove[i][5] = 1
-               possibleMoves.append(nextMove)
-            elif move[j][i] != 0:
-               nextMove = np.copy(move)
-               nextMove[i][j] = 1
-               possibleMoves.append(nextMove)
-   return possibleMoves 
-
-def alpha_beta_pruning(move, depth, alpha, beta, max):
-   if depth == 0 or is_terminal(move):
-      return eval_move(move)
-   possibleMoves = possible_moves(move)
-   if max:
-      value = -math.inf
-      for nextMove in possibleMoves:
-         value = max(value, alpha_beta_pruning(nextMove, depth - 1, alpha, beta, False))
-         alpha = max(alpha, value)
-         if value >= beta:
-            break
-      return value
-   else:
-      value = math.inf
-      for nextMove in possibleMoves:
-         value = min(value, alpha_beta_pruning(nextMove, depth - 1, alpha, beta, True))
-         beta = min(beta, value)
-         if value <= alpha:
-            break
-      return value
