@@ -20,89 +20,87 @@ STIL_ID = ["os7138ce-s"]
 #
 def possible_moves(move, isPlayer):
    possiblemoves = []
+   token = (1 if isPlayer else -1)
    for i in range(7):
       if move[0][i] == 0:
          for j in range(6):
             if move[j][i] != 0:
                nextmove = np.copy(move)
-               nextmove[j-1][i] = (1 if isPlayer else -1)
+               nextmove[j-1][i] = token 
                possiblemoves.append((i, nextmove))
             elif j == 5:
                nextmove = np.copy(move)
-               nextmove[j][i] = (1 if isPlayer else -1)
+               nextmove[j][i] = token 
                possiblemoves.append((i, nextmove))
    return possiblemoves 
 
 def is_terminal(move):
+   # test if full
    if len(possible_moves(move, True)) == 0:
       return True
    
    # taken from connect_four_env
-   # test rows
+   transposed = [list(i) for i in zip(*move)]
+   flipped = np.fliplr(move)
    for i in range(6):
       for j in range(7 - 3):
+            # test rows
             value = sum(move[i][j:j + 4])
             if abs(value) == 4:
                return True
-   # test columns on transpose array
-   transposed_board = [list(i) for i in zip(*move)]
-   for i in range(6):
-      for j in range(7 - 3):
-            value = sum(transposed_board[i][j:j + 4])
+            # test cols
+            value = sum(transposed[i][j:j + 4])
             if abs(value) == 4:
                return True
-   # test diagonal
    for i in range(6 - 3):
       for j in range(7 - 3):
+            # test diagonal
             value = 0
             for k in range(4):
                value += move[i + k][j + k]
                if abs(value) == 4:
                   return True
-   reversed_board = np.fliplr(move)
-   # test reverse diagonal
-   for i in range(6 - 3):
-      for j in range(7 - 3):
+            # test reverse diagonal
             value = 0
             for k in range(4):
-               value += reversed_board[i + k][j + k]
+               value += flipped[i + k][j + k]
                if abs(value) == 4:
                   return True
 
    return False
 
 def eval_move(move):
+   # test if full
+   if len(possible_moves(move, True)) == 0:
+      return 0
+   
    # taken from connect_four_env
-   # test rows
    evalsum = 0
-
+   transposed = [list(i) for i in zip(*move)]
+   flipped = np.fliplr(move)
    for i in range(6):
       for j in range(7 - 3):
+            # test rows
             values = move[i][j:j + 4]
             value = sum(values)
             if abs(value) == 4:
                return math.copysign(1, value) * math.inf
             if not contains(values, -1):
                evalsum += math.pow(10, abs(value))
-            elif not contains (values, 1):
+            elif not contains(values, 1):
                evalsum -= math.pow(10, abs(value))
-
-   # test columns on transpose array
-   transposed = [list(i) for i in zip(*move)]
-   for i in range(6):
-      for j in range(7 - 3):
+            # test cols 
             values = transposed[i][j:j + 4]
             value = sum(values)
             if abs(value) == 4:
                return math.copysign(1, value) * math.inf
             if not contains(values, -1):
                evalsum += math.pow(10, abs(value))
-            elif not contains (values, 1):
+            elif not contains(values, 1):
                evalsum -= math.pow(10, abs(value))
-   
-   # test diagonal
    for i in range(6 - 3):
       for j in range(7 - 3):
+            # test diagonal
             values = []
             for k in range(4):
                values.append(move[i + k][j + k])
@@ -111,22 +109,18 @@ def eval_move(move):
                return math.copysign(1, value) * math.inf
             if not contains(values, -1):
                evalsum += math.pow(10, abs(value))
-            elif not contains (values, 1):
+            elif not contains(values, 1):
                evalsum -= math.pow(10, abs(value))
-            
-   reversed_board = np.fliplr(move)
-   # test reverse diagonal
-   for i in range(6 - 3):
-      for j in range(7 - 3):
+            # test reverse diagonal
             values = []
             for k in range(4):
-               values.append(reversed_board[i + k][j + k])
+               values.append(flipped[i + k][j + k])
             value = sum(values)
             if abs(value) == 4:
                return math.copysign(1, value) * math.inf
             if not contains(values, -1):
                evalsum += math.pow(10, abs(value))
-            elif not contains (values, 1):
+            elif not contains(values, 1):
                evalsum -= math.pow(10, abs(value))
    
    return evalsum
@@ -139,17 +133,17 @@ def alpha_beta_pruning(move, depth, alpha, beta, isPlayer):
       value = -math.inf
       for (_, nextmove) in possiblemoves:
          value = max(value, alpha_beta_pruning(nextmove, depth - 1, alpha, beta, False))
-         alpha = max(alpha, value)
          if value >= beta:
             break
+         alpha = max(alpha, value)
       return value
    else:
       value = math.inf
       for (_, nextmove) in possiblemoves:
          value = min(value, alpha_beta_pruning(nextmove, depth - 1, alpha, beta, True))
-         beta = min(beta, value)
          if value <= alpha:
             break
+         beta = min(beta, value)
       return value
 
 def call_server(move):
@@ -202,12 +196,12 @@ def student_move(state):
    possibleMoves = possible_moves(state, True)
    
    if len(possibleMoves) == 1:
-      return possibleMoves[0];
+      return possibleMoves[0][0];
    
    moveEvaluations = []
    for (choice, move) in possibleMoves:
-      moveEvaluations.append((choice, alpha_beta_pruning(move, 4, -math.inf, math.inf, False)))
-      return max(moveEvaluations, key=itemgetter(1))[0]
+      moveEvaluations.append((choice, alpha_beta_pruning(move, 4, -math.inf, math.inf, False)))   
+   return max(moveEvaluations, key=itemgetter(1))[0]
 
 def play_game(vs_server = False):
    """
