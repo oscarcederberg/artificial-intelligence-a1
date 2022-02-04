@@ -1,12 +1,13 @@
 import math
 from operator import contains, itemgetter
-from xml.etree.ElementTree import tostring
 import gym
 import random
 import requests
 import numpy as np
 import argparse
 import sys
+from timeit import default_timer as timer
+from datetime import timedelta
 from gym_connect_four import ConnectFourEnv
 
 env: ConnectFourEnv = gym.make("ConnectFour-v0")
@@ -28,10 +29,12 @@ def possible_moves(move, isPlayer):
                nextmove = np.copy(move)
                nextmove[j-1][i] = token 
                possiblemoves.append((i, nextmove))
+               break
             elif j == 5:
                nextmove = np.copy(move)
                nextmove[j][i] = token 
                possiblemoves.append((i, nextmove))
+               break
    return possiblemoves 
 
 def is_terminal(move):
@@ -48,8 +51,10 @@ def is_terminal(move):
             value = sum(move[i][j:j + 4])
             if abs(value) == 4:
                return True
+   for i in range(6 - 3):
+      for j in range(7):
             # test cols
-            value = sum(transposed[i][j:j + 4])
+            value = sum(transposed[j][i:i + 4])
             if abs(value) == 4:
                return True
    for i in range(6 - 3):
@@ -78,9 +83,10 @@ def eval_move(move):
    evalsum = 0
    transposed = [list(i) for i in zip(*move)]
    flipped = np.fliplr(move)
+
+   # test rows
    for i in range(6):
       for j in range(7 - 3):
-            # test rows
             values = move[i][j:j + 4]
             value = sum(values)
             if abs(value) == 4:
@@ -89,7 +95,10 @@ def eval_move(move):
                evalsum += math.pow(10, abs(value))
             elif not contains(values, 1):
                evalsum -= math.pow(10, abs(value))
-            # test cols 
+
+   # test cols 
+   for i in range(7):
+      for j in range(6 - 3):
             values = transposed[i][j:j + 4]
             value = sum(values)
             if abs(value) == 4:
@@ -98,9 +107,11 @@ def eval_move(move):
                evalsum += math.pow(10, abs(value))
             elif not contains(values, 1):
                evalsum -= math.pow(10, abs(value))
+
+   # test diagonals
    for i in range(6 - 3):
       for j in range(7 - 3):
-            # test diagonal
+            # test forward diagonals
             values = []
             for k in range(4):
                values.append(move[i + k][j + k])
@@ -111,7 +122,7 @@ def eval_move(move):
                evalsum += math.pow(10, abs(value))
             elif not contains(values, 1):
                evalsum -= math.pow(10, abs(value))
-            # test reverse diagonal
+            # test backward diagonals
             values = []
             for k in range(4):
                values.append(flipped[i + k][j + k])
@@ -133,17 +144,17 @@ def alpha_beta_pruning(move, depth, alpha, beta, isPlayer):
       value = -math.inf
       for (_, nextmove) in possiblemoves:
          value = max(value, alpha_beta_pruning(nextmove, depth - 1, alpha, beta, False))
+         alpha = max(alpha, value)
          if value >= beta:
             break
-         alpha = max(alpha, value)
       return value
    else:
       value = math.inf
       for (_, nextmove) in possiblemoves:
          value = min(value, alpha_beta_pruning(nextmove, depth - 1, alpha, beta, True))
+         beta = min(beta, value)
          if value <= alpha:
             break
-         beta = min(beta, value)
       return value
 
 def call_server(move):
@@ -192,7 +203,8 @@ def opponents_move(env):
    env.change_player() # change back to student before returning
    return state, reward, done
 
-def student_move(state):
+def bluewave_move(state):
+   start = timer()
    possibleMoves = possible_moves(state, True)
    
    if len(possibleMoves) == 1:
@@ -200,23 +212,35 @@ def student_move(state):
    
    moveEvaluations = []
    for (choice, move) in possibleMoves:
-      moveEvaluations.append((choice, alpha_beta_pruning(move, 4, -math.inf, math.inf, False)))   
-   return max(moveEvaluations, key=itemgetter(1))[0]
+      moveEvaluations.append((choice, alpha_beta_pruning(move, 5, -math.inf, math.inf, False)))
+   
+   bestChoice = max(moveEvaluations, key=itemgetter(1))[0]
+   
+   for (choice, value) in moveEvaluations:
+      prefix = " <" if choice == bestChoice else ""
+      print("choice " + str(choice + 1) + ": " + str(value) + " points" + prefix)
+   end = timer()
+   print("eval. time: " + str(timedelta(seconds=end-start)))
+   print()
+   return bestChoice 
+
+def to_emoji(token):
+   if token == 1:
+      return '🔵'
+   elif token == -1:
+      return '🔴'
+   else:
+      return '⬛'
+
+def print_state(state):
+   formatted = ["".join(list(map(to_emoji, row))) for row in state]
+   for row in formatted:
+      print(row)
 
 def play_game(vs_server = False):
-   """
-   The reward for a game is as follows. You get a
-   botaction = random.choice(list(avmoves)) reward from the
-   server after each move, but it is 0 while the game is running
-   loss = -1
-   win = +1
-   draw = +0.5
-   error = -10 (you get this if you try to play in a full column)
-   Currently the player always makes the first move
-   """
-
    # default state
    state = np.zeros((6, 7), dtype=int)
+   currentRound = 0
 
    # setup new game
    if vs_server:
@@ -233,21 +257,23 @@ def play_game(vs_server = False):
       # determine first player
       student_gets_move = random.choice([True, False])
       if student_gets_move:
-         print('You start!')
+         print('🌊 starts!')
          print()
       else:
          print('Bot starts!')
          print()
 
    # Print current gamestate
-   print("Current state (1 are student discs, -1 are servers, 0 is empty): ")
-   print(state)
+   print("Current state (Blue are 🌊's discs, Red are servers): ")
+   print_state(state)
    print()
 
    done = False
    while not done:
       # Select your move
-      stmove = student_move(state) 
+      currentRound += 1
+      print("round " + str(currentRound));
+      stmove = bluewave_move(state) 
 
       # make both student and bot/server moves
       if vs_server:
@@ -264,7 +290,7 @@ def play_game(vs_server = False):
             # Execute your move
             avmoves = env.available_moves()
             if stmove not in avmoves:
-               print("You tied to make an illegal move! You have lost the game.")
+               print("🌊 tried to make an illegal move! 🌊 has lost the game.")
                break
             state, result, done, _ = env.step(stmove)
 
@@ -282,22 +308,22 @@ def play_game(vs_server = False):
          if not vs_server:
             print("Game over. ", end="")
          if result == 1:
-            print("You won!")
+            print("🌊 won!")
          elif result == 0.5:
             print("It's a draw!")
          elif result == -1:
-            print("You lost!")
+            print("🌊 lost!")
          elif result == -10:
-            print("You made an illegal move and have lost!")
+            print("🌊 made an illegal move and have lost!")
          else:
             print("Unexpected result result={}".format(result))
          if not vs_server:
-            print("Final state (1 are student discs, -1 are servers, 0 is empty): ")
+            print("Final state (Blue are 🌊's discs, Red are servers): ")
       else:
-         print("Current state (1 are student discs, -1 are servers, 0 is empty): ")
+         print("Current state (Blue are 🌊's discs, Red are servers): ")
 
       # Print current gamestate
-      print(state)
+      print_state(state)
       print()
 
 def main():
@@ -306,7 +332,7 @@ def main():
    group = parser.add_mutually_exclusive_group()
    group.add_argument("-l", "--local", help = "Play locally", action="store_true")
    group.add_argument("-o", "--online", help = "Play online vs server", action="store_true")
-   parser.add_argument("-s", "--stats", help = "Show your current online stats", action="store_true")
+   parser.add_argument("-s", "--stats", help = "Show 🌊's current online stats", action="store_true")
    args = parser.parse_args()
 
    # Print usage info if no arguments are given
