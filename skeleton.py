@@ -91,10 +91,11 @@ def eval_move(move):
             value = sum(values)
             if abs(value) == 4:
                return math.copysign(1, value) * math.inf
-            if not contains(values, -1):
-               evalsum += math.pow(10, abs(value))
-            elif not contains(values, 1):
-               evalsum -= math.pow(10, abs(value))
+            if abs(value) > 1:
+               if not contains(values, -1):
+                  evalsum += math.pow(10, abs(value))
+               elif not contains(values, 1):
+                  evalsum -= math.pow(10, abs(value))
 
    # test cols 
    for i in range(7):
@@ -103,10 +104,11 @@ def eval_move(move):
             value = sum(values)
             if abs(value) == 4:
                return math.copysign(1, value) * math.inf
-            if not contains(values, -1):
-               evalsum += math.pow(10, abs(value))
-            elif not contains(values, 1):
-               evalsum -= math.pow(10, abs(value))
+            if abs(value) > 1:
+               if not contains(values, -1):
+                  evalsum += math.pow(10, abs(value))
+               elif not contains(values, 1):
+                  evalsum -= math.pow(10, abs(value))
 
    # test diagonals
    for i in range(6 - 3):
@@ -118,10 +120,11 @@ def eval_move(move):
             value = sum(values)
             if abs(value) == 4:
                return math.copysign(1, value) * math.inf
-            if not contains(values, -1):
-               evalsum += math.pow(10, abs(value))
-            elif not contains(values, 1):
-               evalsum -= math.pow(10, abs(value))
+            if abs(value) > 1:
+               if not contains(values, -1):
+                  evalsum += math.pow(10, abs(value))
+               elif not contains(values, 1):
+                  evalsum -= math.pow(10, abs(value))
             # test backward diagonals
             values = []
             for k in range(4):
@@ -129,10 +132,11 @@ def eval_move(move):
             value = sum(values)
             if abs(value) == 4:
                return math.copysign(1, value) * math.inf
-            if not contains(values, -1):
-               evalsum += math.pow(10, abs(value))
-            elif not contains(values, 1):
-               evalsum -= math.pow(10, abs(value))
+            if abs(value) > 1:
+               if not contains(values, -1):
+                  evalsum += math.pow(10, abs(value))
+               elif not contains(values, 1):
+                  evalsum -= math.pow(10, abs(value))
    
    return evalsum
 
